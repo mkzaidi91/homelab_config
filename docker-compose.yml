@@ -1,0 +1,557 @@
+services:
+  # --- INFRASTRUCTURE ---
+  cloudflared:
+    container_name: cloudflared
+    image: cloudflare/cloudflared:latest
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    command: tunnel run
+    networks:
+      - homelab_network
+      - cloudflare_bridge
+    depends_on:
+      - nginx-proxy-manager
+      - pihole
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8080:8080
+      - 7878:7878
+      - 8989:8989
+      - 9696:9696
+      - 5055:5055
+      - 8191:8191
+      - 5299:5299
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=1kphDuj1jvsQXyjXiTi1MEXW
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - OPENVPN_PROTOCOL=udp
+      - SERVER_COUNTRIES=Germany
+      - SERVER_REGIONS=Europe
+      - DNS_ADDRESS=1.1.1.1
+      - FIREWALL_OUTBOUND_SUBNETS=172.16.0.0/12,192.168.0.0/16
+      - OPENVPN_VERB=1
+    networks:
+      - homelab_network
+    restart: always
+
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    volumes:
+      - /home/iso/npm/data:/data
+      - /home/iso/npm/letsencrypt:/etc/letsencrypt
+    networks:
+      - homelab_network
+
+  # --- UTILITIES & DASHBOARD ---
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    ports:
+      - 3005:3000
+    dns:
+      - 127.0.0.11
+      - 1.1.1.1
+    environment:
+      - HOMEPAGE_ALLOWED_HOSTS=192.168.1.30:3005,localhost:3005,dash.iso-lab.me
+    volumes:
+      - /home/iso/homepage/config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - homelab_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - homelab_network
+    restart: always
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup --interval 86400
+    restart: always
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 8083:8080
+    networks:
+      - homelab_network
+
+  # === GUACAMOLE ===
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: guacd
+    restart: unless-stopped
+    environment:
+      - GUACD_KEEPALIVE=10
+    volumes:
+      - guacd_drive:/drive
+      - guacd_record:/record
+    networks:
+      - homelab_network
+
+  guacamole-postgres:
+    image: postgres:16-alpine
+    container_name: guacamole-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: guacamole_db
+      POSTGRES_USER: guacamole_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - guacamole_postgres_data:/var/lib/postgresql/data
+      - ./guacamole-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - homelab_network
+
+  guacamole:
+    image: guacamole/guacamole:latest
+    container_name: guacamole
+    restart: unless-stopped
+    depends_on:
+      - guacd
+      - guacamole-postgres
+    environment:
+      GUACD_HOSTNAME: guacd
+      POSTGRESQL_HOSTNAME: guacamole-postgres
+      POSTGRESQL_DATABASE: guacamole_db
+      POSTGRESQL_USER: guacamole_user
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      WEBAPP_CONTEXT: ROOT
+    ports:
+      - "8095:8080"
+    networks:
+      - homelab_network
+      - cloudflare_bridge
+
+  # --- SECURITY & STORAGE ---
+  frigate:
+    container_name: frigate
+    privileged: true
+    restart: unless-stopped
+    image: ghcr.io/blakeblackshear/frigate:stable
+    shm_size: "512mb"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    volumes:
+      - /home/iso/frigate/config:/config
+      - /home/iso/frigate/storage:/media/frigate
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+    networks:
+      - homelab_network
+      - cloudflare_bridge
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: always
+    ports:
+      - "8084:80"
+    volumes:
+      - /home/iso/vaultwarden:/data
+    networks:
+      - homelab_network
+
+  # --- MEDIA STACK (BEHIND VPN) ---
+  lazylibrarian:
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /home/iso/lazylibrarian/config:/config
+      - /mnt/nas/books:/books
+      - /home/iso/downloads:/downloads
+    restart: always
+    depends_on:
+      - gluetun
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - /home/iso/sonarr/config:/config
+      - /mnt/nas/tv:/tv
+      - /home/iso/downloads:/downloads
+      - /mnt/mediadrive:/media
+    restart: always
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - /home/iso/radarr/config:/config
+      - /mnt/nas/movies:/movies
+      - /home/iso/downloads:/downloads
+      - /mnt/mediadrive:/media
+    restart: always
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - /home/iso/qbittorrent/config:/config
+      - /home/iso/downloads:/downloads
+    restart: always
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - /home/iso/prowlarr/config:/config
+    restart: always
+
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    init: true
+    network_mode: "service:gluetun"
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - /home/iso/jellyseerr/config:/app/config
+    restart: always
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    restart: always
+
+  # --- CORE MEDIA & CLOUD ---
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    ports:
+      - 8096:8096
+    volumes:
+      - /home/iso/jellyfin/config:/config
+      - /mnt/nas/tv:/tv
+      - /mnt/nas/movies:/movies
+      - /mnt/nas/nsfw:/nsfw
+      - /media/jellyfin:/data/media
+    networks:
+      - homelab_network
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - /home/iso/nextcloud/data:/var/www/html
+    environment:
+      - MYSQL_HOST=nextcloud-db
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    networks:
+      - homelab_network
+    depends_on:
+      - nextcloud-db
+
+  nextcloud-db:
+    image: mariadb:10.6
+    container_name: nextcloud_db
+    volumes:
+      - /home/iso/nextcloud/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    networks:
+      - homelab_network
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    ports:
+      - 3001:3001
+    volumes:
+      - /home/iso/uptime-kuma:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab_network
+    restart: always
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "67:67/udp"
+      - "8090:80"
+    environment:
+      - TZ=America/Chicago
+      - WEBPASSWORD=${WEBPASSWORD}
+    volumes:
+      - /home/iso/pihole/config:/etc/pihole
+      - /home/iso/pihole/dnsmasq:/etc/dnsmasq.d
+    networks:
+      - homelab_network
+
+  # --- ADDITIONAL UTILITIES ---
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    container_name: stirling-pdf
+    restart: always
+    ports:
+      - 8082:8080
+    networks:
+      - homelab_network
+
+  pulse:
+    image: rcourtman/pulse:latest
+    container_name: pulse
+    restart: unless-stopped
+    ports:
+      - 3002:7655
+    environment:
+      - PULSE_PUBLIC_URL=https://pulse.iso-lab.me
+    networks:
+      - homelab_network
+
+  syncthing:
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /home/iso/syncthing/config:/config
+      - /home/iso/syncthing/data:/data
+    ports:
+      - "8384:8384"   # Web UI
+      - "22000:22000/tcp"  # Sync protocol (TCP)
+      - "22000:22000/udp"  # Sync protocol (QUIC)
+      - "21027:21027/udp"  # Local discovery
+    networks:
+      - homelab_network
+
+  # --- PRODUCTIVITY & TOOLS ---
+  it-tools:
+    image: corentinth/it-tools:latest
+    container_name: it-tools
+    restart: unless-stopped
+    ports:
+      - "8085:80"
+    networks:
+      - homelab_network
+
+  drawio:
+    image: jgraph/drawio:latest
+    container_name: drawio
+    restart: unless-stopped
+    ports:
+      - "8086:8080"
+      - "18443:8443"
+    networks:
+      - homelab_network
+
+  excalidraw:
+    image: excalidraw/excalidraw:latest
+    container_name: excalidraw
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    networks:
+      - homelab_network
+
+  # --- MEDIA ARCHIVING ---
+  tubearchivist:
+    container_name: tubearchivist
+    image: bbilly1/tubearchivist:latest
+    restart: unless-stopped
+    ports:
+      - 8087:8000
+    volumes:
+      - /home/iso/tubearchivist/media:/youtube
+      - /home/iso/tubearchivist/cache:/cache
+    environment:
+      - REDIS_CON=redis://redis:6379/0
+      - ES_URL=http://elastic:KingZaidi91@archivist-es:9200
+      - HOST_UID=1000
+      - HOST_GID=1000
+      - TA_HOST=192.168.1.30
+      - TA_USERNAME=admin
+      - TA_PASSWORD=${TA_PASSWORD}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - TZ=America/Chicago
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - homelab_network
+    depends_on:
+      - archivist-es
+      - redis
+
+  archivist-es:
+    container_name: archivist-es
+    image: bbilly1/tubearchivist-es:latest
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    environment:
+      - "ELASTIC_PASSWORD=${ELASTIC_PASSWORD}"
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "xpack.security.enabled=true"
+      - "discovery.type=single-node"
+      - "path.repo=/usr/share/elasticsearch/data/snapshot"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - /home/iso/tubearchivist/es:/usr/share/elasticsearch/data
+    networks:
+      - homelab_network
+
+  # --- GRAFANA ---
+  influxdb:
+    container_name: influxdb
+    image: influxdb:2.7
+    restart: always
+    ports:
+      - "8088:8086"
+    volumes:
+      - /home/iso/influxdb/data:/var/lib/influxdb2
+      - /home/iso/influxdb/config:/etc/influxdb2
+    networks:
+      - homelab_network
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - /home/iso/grafana/data:/var/lib/grafana
+    networks:
+      - homelab_network
+    user: "1000"
+
+  # --- BUDGETING ---
+  actual-budget:
+    image: ghcr.io/actualbudget/actual-server:latest
+    container_name: actual_budget
+    restart: unless-stopped
+    ports:
+      - "5006:5006"
+    volumes:
+      - /home/iso/actual-budget/data:/data
+    networks:
+      - homelab_network
+
+  # --- MONITORING ---
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    restart: unless-stopped
+    pid: host
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "19999:19999"
+    volumes:
+      - /home/iso/netdata/config:/etc/netdata
+      - /home/iso/netdata/lib:/var/lib/netdata
+      - /home/iso/netdata/cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/hostname:/etc/hostname:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab_network
+
+
+networks:
+  homelab_network:
+    name: homelab_network
+  cloudflare_bridge:
+    name: cloudflare_bridge
+
+
+# ===================== IMPORTANT =====================
+volumes:
+  guacd_drive:
+  guacd_record:
+  guacamole_postgres_data:
