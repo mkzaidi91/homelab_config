@@ -75,6 +75,7 @@ services:
       - HOMEPAGE_ALLOWED_HOSTS=192.168.1.30:3005,localhost:3005,dash.iso-lab.me
     volumes:
       - /home/iso/homepage/config:/app/config
+      - /home/iso/homelab-config/homepage:/home/iso/homelab-config/homepage:ro
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - homelab_network
