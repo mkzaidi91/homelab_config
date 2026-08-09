@@ -66,6 +66,8 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
+    env_file:
+      - /home/iso/homelab-config/.env
     ports:
       - 3005:3000
     dns:
@@ -89,7 +91,7 @@ services:
     restart: always
 
   watchtower:
-    image: containrrr/watchtower
+    image: ghcr.io/nicholas-fedor/watchtower:latest
     container_name: watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -105,6 +107,7 @@ services:
       - 8083:8080
     networks:
       - homelab_network
+    restart: unless-stopped
 
   # === GUACAMOLE ===
   guacd:
@@ -326,6 +329,7 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     networks:
       - homelab_network
+    restart: unless-stopped
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
@@ -544,6 +548,19 @@ services:
       - homelab_network
 
 
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    ports:
+      - 9000:9000
+      - 9443:9443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - homelab_network
+    restart: unless-stopped
+
 networks:
   homelab_network:
     name: homelab_network
@@ -553,6 +570,7 @@ networks:
 
 # ===================== IMPORTANT =====================
 volumes:
+  portainer_data:
   guacd_drive:
   guacd_record:
   guacamole_postgres_data:
