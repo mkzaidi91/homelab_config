@@ -1,0 +1,10 @@
+- datetime:
+    text_size: l
+    format:
+      date: long
+      time: short
+      hour12: true
+
+- search:
+    provider: duckduckgo
+    target: _blank

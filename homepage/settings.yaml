@@ -1,0 +1,12 @@
+---
+# For configuration options and examples, please see:
+# https://gethomepage.dev/configs/settings/
+
+allowHostname: true
+
+background:
+  image: http://192.168.1.30:3005/images/background.jpg
+  blur: sm        # sm, md, xl, 2xl, 3xl
+  saturate: 100   # 0-100
+  brightness: 50  # 0-100
+  opacity: 100    # 0-100

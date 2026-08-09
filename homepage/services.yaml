@@ -1,0 +1,210 @@
+- Infrastructure:
+    - Proxmox:
+        icon: proxmox.png
+        href: https://192.168.1.33:8006 # Keep local/Tailscale for security
+        widget:
+          type: proxmox
+          url: https://192.168.1.33:8006
+          username: api_1@pve!homepage
+          password: "{{HOMEPAGE_VAR_PROXMOX_WIDGET_PASSWORD}}"
+          node: pve
+          verify: false
+
+    - Cloudflared:
+        icon: cloudflare.png
+        href: https://dash.cloudflare.com
+        description: Tunnel for iso-lab.me
+
+    - Nginx Proxy Manager:
+        icon: nginx-proxy-manager.png
+        href: http://192.168.1.30:81
+        description: Reverse Proxy
+
+    - Portainer:
+        icon: portainer.png
+        href: https://192.168.1.30:9443
+        description: Container Management
+        widget:
+          type: portainer
+          url: https://192.168.1.30:9443
+          key: "{{HOMEPAGE_VAR_PORTAINER_KEY}}"
+          env: 3  # <--- CHANGED FROM 1 TO 3
+          allowInsecure: true
+
+    - Gluetun:
+        icon: gluetun.png
+        href: https://github.com/qdm12/gluetun
+        description: VPN Entry Point
+
+    - Pi-hole:
+        icon: pi-hole.png
+        href: https://pihole.iso-lab.me/admin
+        widget:
+          type: pihole
+          url: http://pihole:80
+          version: 6
+          key: "{{HOMEPAGE_VAR_PIHOLE_KEY}}"
+
+- Media Stack:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: https://jellyfin.iso-lab.me
+        widget:
+          type: jellyfin
+          url: http://192.168.1.30:8096
+          key: "{{HOMEPAGE_VAR_JELLYFIN_KEY}}"
+
+    - Seerr:
+        icon: jellyseerr.png
+        href: https://requests.iso-lab.me
+        widget:
+          type: overseerr # <--- FIXED FROM jellyseerr TO overseerr
+          url: http://gluetun:5055
+          key: "{{HOMEPAGE_VAR_SEERR_KEY}}"
+
+    - Sonarr:
+        icon: sonarr.png
+        href: https://tv.iso-lab.me
+        widget:
+          type: sonarr
+          url: http://gluetun:8989
+          key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
+
+    - Radarr:
+        icon: radarr.png
+        href: https://movies.iso-lab.me
+        widget:
+          type: radarr
+          url: http://gluetun:7878
+          key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: http://192.168.1.30:9696
+        description: Indexer Manager
+        widget:
+          type: prowlarr
+          url: http://gluetun:9696
+          key: "{{HOMEPAGE_VAR_PROWLARR_KEY}}"
+
+    - LazyLibrarian:
+        icon: lazylibrarian.png
+        href: http://192.168.1.30:5299
+        description: Books & Audiobooks
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://downloads.iso-lab.me
+        widget:
+          type: qbittorrent
+          url: http://gluetun:8080
+          username: admin
+          password: "{{HOMEPAGE_VAR_SERVICE_PASSWORD}}"
+
+    - TubeArchivist:
+        icon: youtube.png
+        href: http://192.168.1.30:8087
+        description: Self-hosted YouTube archive
+        widget:
+          type: tubearchivist
+          url: http://192.168.1.30:8087
+          key: "{{HOMEPAGE_VAR_TUBEARCHIVIST_KEY}}"
+
+- Productivity:
+    - IT-Tools:
+        icon: it-tools.png
+        href: https://tools.iso-lab.me
+
+    - Draw.io:
+        icon: diagrams-net.png
+        href: https://draw.iso-lab.me
+
+    - Excalidraw:
+        icon: excalidraw.png
+        href: http://192.168.1.30:8091
+        description: Virtual Whiteboard
+
+    - Stirling PDF:
+        icon: stirling-pdf.png
+        href: https://pdf.iso-lab.me
+
+    - Nextcloud:
+        icon: nextcloud.png
+        href: http://192.168.1.30:8081
+        description: Self-hosted Cloud Storage
+        widget:
+          type: nextcloud
+          url: http://nextcloud:80
+          username: iso
+          password: "{{HOMEPAGE_VAR_SERVICE_PASSWORD}}"
+
+    - Syncthing:
+        icon: syncthing.png
+        href: http://192.168.1.30:8384
+        description: File Sync
+
+    - Actual Budget:
+        icon: actual-budget.png
+        href: http://192.168.1.30:5006
+        description: Personal Finance
+
+    - Guacamole:
+        icon: guacamole.png
+        href: http://192.168.1.30:8095/
+        description: Remote Desktop / SSH / VNC Gateway
+        target: _blank
+        ping: http://192.168.1.30:8095
+
+- Utilities & Security:
+    - Vaultwarden:
+        icon: vaultwarden.png
+        href: https://vault.iso-lab.me
+
+    - Frigate:
+        icon: frigate.png
+        href: https://cameras.iso-lab.me
+        widget:
+          type: frigate
+          url: http://frigate:5000
+
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: https://status.iso-lab.me
+        widget:
+          type: uptimekuma
+          url: http://uptime-kuma:3001
+          slug: main
+          key: "{{HOMEPAGE_VAR_UPTIMEKUMA_KEY}}"
+
+- Monitoring:
+    - Netdata:
+        icon: netdata.png
+        href: http://192.168.1.30:19999
+        description: Real-time System Monitoring
+        widget:
+          type: netdata
+          url: http://netdata:19999
+
+    - Pulse:
+        icon: pulse.png
+        href: http://192.168.1.30:3002
+        description: Proxmox Monitoring
+
+    - InfluxDB:
+        icon: influxdb.png
+        href: http://192.168.1.30:8088
+        description: Time Series Database
+
+- Management:
+    - Dozzle:
+        icon: dozzle.png
+        href: http://192.168.1.30:8083 # Usually kept local for security
+
+    - Watchtower:
+        icon: watchtower.png
+        description: Automating updates
+
+    - Flaresolverr:
+        icon: flaresolverr.png
+        href: http://192.168.1.30:8191
+        description: Cloudflare Bypass Proxy
