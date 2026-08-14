@@ -256,6 +256,17 @@ services:
     networks:
       - homelab_network
 
+  threadfin:
+    image: fyb3roptik/threadfin:latest
+    container_name: threadfin
+    restart: unless-stopped
+    ports:
+      - 34400:34400
+    volumes:
+      - /home/iso/threadfin/conf:/home/threadfin/conf
+    networks:
+      - homelab_network
+
   # =====================================================
   # PRODUCTIVITY
   # =====================================================
