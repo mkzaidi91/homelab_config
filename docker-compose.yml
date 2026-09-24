@@ -214,7 +214,7 @@ services:
       - /home/iso/tubearchivist/cache:/cache
     environment:
       - REDIS_CON=redis://redis:6379/0
-      - ES_URL=http://elastic:KingZaidi91@archivist-es:9200
+      - ES_URL=http://elastic:${ELASTIC_PASSWORD}@archivist-es:9200
       - HOST_UID=1000
       - HOST_GID=1000
       - TA_HOST=192.168.1.30
