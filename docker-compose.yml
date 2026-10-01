@@ -38,7 +38,7 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=nordvpn
       - VPN_TYPE=openvpn
-      - OPENVPN_USER=1kphDuj1jvsQXyjXiTi1MEXW
+      - OPENVPN_USER=${OPENVPN_USER}
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
       - OPENVPN_PROTOCOL=udp
       - SERVER_COUNTRIES=Germany
